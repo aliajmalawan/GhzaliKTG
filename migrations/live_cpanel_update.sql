@@ -1,54 +1,87 @@
 -- ============================================================================
 -- Ghazali School & College Katlang - LIVE DATABASE UPDATE (cPanel / phpMyAdmin)
--- ============================================================================
--- How to run:
---   1. cPanel > phpMyAdmin > select the live database (left side).
---   2. Take a backup first: Export tab > Quick > Go.
---   3. Open the SQL tab, paste this whole file, click Go.
--- Safe to run more than once. It only ADDS columns / settings; it never drops
--- tables or columns and never changes existing records.
--- Requires MariaDB 10.1+ (standard on cPanel). On MySQL 5.7 remove "IF NOT EXISTS".
+-- Works on MySQL 5.7 / 8.x and MariaDB. Safe to run more than once.
+-- It only ADDS missing columns / settings; it never drops or changes existing data.
+--
+-- How to run: phpMyAdmin > select the live database > SQL tab > paste all > Go.
+-- (Take a backup first: Export > Quick > Go.)
 -- ============================================================================
 
 
--- 1) Admissions: soft delete (Delete / Delete Selected in AdminCP > Admissions)
-ALTER TABLE `admissions`
-  ADD COLUMN IF NOT EXISTS `deleted_at` DATETIME NULL DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `deleted_by` INT NULL DEFAULT NULL;
-CREATE INDEX IF NOT EXISTS `idx_admissions_deleted_at` ON `admissions` (`deleted_at`);
+-- 1) admissions: deleted_at (soft delete)
+SET @q = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE `admissions` ADD COLUMN `deleted_at` DATETIME NULL DEFAULT NULL',
+  'SELECT ''admissions.deleted_at already exists'' AS info')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admissions' AND COLUMN_NAME = 'deleted_at');
+PREPARE stmt FROM @q; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 2) admissions: deleted_by
+SET @q = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE `admissions` ADD COLUMN `deleted_by` INT NULL DEFAULT NULL',
+  'SELECT ''admissions.deleted_by already exists'' AS info')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admissions' AND COLUMN_NAME = 'deleted_by');
+PREPARE stmt FROM @q; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 3) admissions: index on deleted_at
+SET @q = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE `admissions` ADD INDEX `idx_admissions_deleted_at` (`deleted_at`)',
+  'SELECT ''index already exists'' AS info')
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admissions' AND INDEX_NAME = 'idx_admissions_deleted_at');
+PREPARE stmt FROM @q; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 
--- 2) Board results: PDF / DOC / DOCX document support (AdminCP > Matric Results)
-ALTER TABLE `board_results`
-  ADD COLUMN IF NOT EXISTS `file_path` VARCHAR(255) NULL DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `original_name` VARCHAR(255) NULL DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `file_type` VARCHAR(10) NULL DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `file_size` INT NULL DEFAULT NULL;
+-- 4) board_results: file_path
+SET @q = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE `board_results` ADD COLUMN `file_path` VARCHAR(255) NULL DEFAULT NULL',
+  'SELECT ''board_results.file_path already exists'' AS info')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'board_results' AND COLUMN_NAME = 'file_path');
+PREPARE stmt FROM @q; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 5) board_results: original_name
+SET @q = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE `board_results` ADD COLUMN `original_name` VARCHAR(255) NULL DEFAULT NULL',
+  'SELECT ''board_results.original_name already exists'' AS info')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'board_results' AND COLUMN_NAME = 'original_name');
+PREPARE stmt FROM @q; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 6) board_results: file_type
+SET @q = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE `board_results` ADD COLUMN `file_type` VARCHAR(10) NULL DEFAULT NULL',
+  'SELECT ''board_results.file_type already exists'' AS info')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'board_results' AND COLUMN_NAME = 'file_type');
+PREPARE stmt FROM @q; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 7) board_results: file_size
+SET @q = (SELECT IF(COUNT(*) = 0,
+  'ALTER TABLE `board_results` ADD COLUMN `file_size` INT NULL DEFAULT NULL',
+  'SELECT ''board_results.file_size already exists'' AS info')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'board_results' AND COLUMN_NAME = 'file_size');
+PREPARE stmt FROM @q; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 
--- 3) Site settings (only inserted if missing; existing values are kept)
---    Result software link given by the client (editable in AdminCP > Site Settings > Result Portal)
+-- 8) Settings (inserted only if missing; existing values are kept)
 INSERT INTO `settings` (`setting_key`, `setting_value`, `setting_type`)
 VALUES ('result_portal_url', 'https://apps.eduportal.pk/Production/', 'text')
 ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;
 
---    Small line under the school name in the header
 INSERT INTO `settings` (`setting_key`, `setting_value`, `setting_type`)
 VALUES ('header_tagline', 'Katlang, District Mardan', 'text')
 ON DUPLICATE KEY UPDATE `setting_key` = `setting_key`;
 
 
 -- ============================================================================
--- OPTIONAL - run only when you have the real values (otherwise leave commented).
--- Until then the site shows "Coming Soon" buttons for the mobile app.
--- It is safer to enter these in AdminCP > Site Settings > Mobile App Links,
--- because that form checks the Google Play link before saving.
+-- OPTIONAL (leave commented until you have the real values)
 -- ============================================================================
 -- INSERT INTO `settings` (`setting_key`, `setting_value`, `setting_type`)
 -- VALUES ('play_store_url', 'PASTE_VERIFIED_GOOGLE_PLAY_URL_HERE', 'text')
 -- ON DUPLICATE KEY UPDATE `setting_value` = VALUES(`setting_value`);
-
--- News bar announcement example (the "notifications" table; status: active / inactive).
--- Replace the text with your real announcement before running.
+--
 -- INSERT INTO `notifications` (`title`, `link`, `display_order`, `status`)
 -- VALUES ('YOUR ANNOUNCEMENT TEXT HERE', 'admission.php', 1, 'active');
