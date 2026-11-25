@@ -1,0 +1,16 @@
+# Secrets / credentials
+includes/mail.env
+website/includes/config.php
+
+# Logs
+error_log
+**/error_log
+includes/mail.log
+
+# Student-submitted documents (personal data)
+uploads/documents/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
