@@ -126,6 +126,9 @@ function trackPageView($conn) {
     $os = getOperatingSystem($user_agent);
     $visit_date = date('Y-m-d');
     $visit_time = date('H:i:s');
+    $visitor_session_id = md5($session_id . '|' . $visit_date);
+    $visitor_ip_sql = mysqli_real_escape_string($conn, $visitor_ip);
+    $user_agent_sql = mysqli_real_escape_string($conn, $user_agent);
 
     // Insert page view
     $sql = "INSERT INTO website_analytics
@@ -135,16 +138,22 @@ function trackPageView($conn) {
 
     mysqli_query($conn, $sql);
 
-    // Update or insert unique visitor based on fingerprint (more reliable)
-    $check_visitor = mysqli_query($conn, "SELECT id, total_visits FROM unique_visitors WHERE visitor_ip = '$visitor_ip' AND DATE(last_visit) = CURDATE()");
+    // Keep unique visitor session IDs distinct across days, as the database index is global.
+    $check_visitor = mysqli_query($conn, "SELECT id FROM unique_visitors
+        WHERE session_id = '$visitor_session_id'
+        OR (visitor_ip = '$visitor_ip_sql' AND DATE(last_visit) = CURDATE())
+        ORDER BY (session_id = '$visitor_session_id') DESC
+        LIMIT 1");
 
     if (mysqli_num_rows($check_visitor) > 0) {
-        // Update existing visitor for today
+        // Update the existing session or today's visitor without replacing its unique session ID.
         $visitor = mysqli_fetch_assoc($check_visitor);
-        mysqli_query($conn, "UPDATE unique_visitors SET last_visit = NOW(), total_visits = total_visits + 1, session_id = '$session_id' WHERE id = " . $visitor['id']);
+        mysqli_query($conn, "UPDATE unique_visitors SET last_visit = NOW(), total_visits = total_visits + 1 WHERE id = " . $visitor['id']);
     } else {
-        // New visitor for today
-        mysqli_query($conn, "INSERT INTO unique_visitors (visitor_ip, session_id, user_agent) VALUES ('$visitor_ip', '$session_id', '$user_agent')");
+        // The upsert also handles simultaneous requests for the same visitor session.
+        mysqli_query($conn, "INSERT INTO unique_visitors (visitor_ip, session_id, user_agent)
+            VALUES ('$visitor_ip_sql', '$visitor_session_id', '$user_agent_sql')
+            ON DUPLICATE KEY UPDATE last_visit = NOW(), total_visits = total_visits + 1");
     }
 
     // Update active users (online now) - Use IP as unique identifier
