@@ -14,3 +14,6 @@ uploads/documents/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Deployed copy with production credentials and student uploads - never commit
+website/
