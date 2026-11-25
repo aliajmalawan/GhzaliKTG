@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Close mobile menu when clicking outside
     document.addEventListener('click', function(e) {
         if (!e.target.closest('nav')) {
-            navLinks.classList.remove('active');
+            if (navLinks) navLinks.classList.remove('active');
             if (menuToggle) {
                 menuToggle.classList.remove('active');
             }
